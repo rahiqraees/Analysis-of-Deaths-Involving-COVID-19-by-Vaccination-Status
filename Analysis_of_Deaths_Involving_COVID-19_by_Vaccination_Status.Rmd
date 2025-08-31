@@ -1,0 +1,121 @@
+---
+title: "Analysis of Deaths Involving COVID-19 by Vaccination Status"
+author: "Rahiq Raees"
+date: "2024-03-27"
+output: html_document
+---
+
+# Description of the Variables and Data
+
+
+```{r,echo=FALSE,message=FALSE}
+library(tidyverse)
+library(knitr)
+d <- read_csv('~/Desktop/vaccine.csv')
+
+summary(d)
+```
+
+This dataset reports the daily reported number of the 7-day moving average rates of Deaths involving COVID-19 by vaccination status and by age group from March 1st, 2021 to March 20th, 2024.
+
+* $\textbf{_id:}$ Row number of data
+
+* $\textbf{date:}$ Date on which the death occurred
+
+* $\textbf{age_group:}$ Age group with levels 0-4yrs, 5-11yrs, 12-17yrs 18-39yrs, 40-59yrs, 60+, and ALL
+
+* $\textbf{deaths_boost_vac_rate_7ma:}$ 7-day moving average of the last seven days of the death rate per 100,000 for those vaccinated with at least one booster
+
+* $\textbf{deaths_full_vac_rate_7ma}:$ 7-day moving average of the last seven days of the death rate per 100,000 for those fully vaccinated
+
+* $\textbf{deaths_not_full_vac_rate_7ma:}$ 7-day moving average of the last seven days of the death rate per 100,000 for those not fully vaccinated
+
+“Not fully vaccinated” category includes people with no vaccine and one dose of double-dose vaccine.
+
+# Background of the Data
+
+The data is collected by Public Health Units across Ontario. A public health unit is a government organization under the supervision of a local board of health. These PHUs are under the direction of a Medical Officer of Health, who is appointed by the supervising board of health. PHUs continually clean up COVID-19 data and enter them into CCM. CCM is a dynamic disease reporting system which allows ongoing update to data previously entered. As a result, data extracted from CCM represents a snapshot at the time of extraction and may differ from previous or subsequent results.
+
+Public health units collect vaccination data for the following reasons:
+
+* $\textbf{Monitoring Effectiveness:}$ This includes assessing how well vaccines prevent infection, transmission, as well as how long their protection lasts.
+
+* $\textbf{Safety Monitering:}$ Gathering data on adverse reactions or side effects.
+
+* $\textbf{Public Confidence:}$  Accurate information about vaccine efficacy builds trust with communities which promotes an increase in vaccinations among citizens.
+
+# Research Question
+
+How does COVID-19 mortality vary among vaccinated and not fully vaccinated individuals in Ontario, and what factors contribute to any observed differences.
+
+# Tables
+
+```{r,echo = FALSE}
+d <- d  %>% filter(!age_group=='ALL') # Removed the ALL age group observations because it actually did not represent all age groups. Thus, it was an unknown factor to us.
+
+d<-d %>% mutate(date_var = as.Date(date),year=year(date_var),month=month(date_var),day=day(date_var)) # Creating columns for year,month, and day
+
+t1 <- d  %>% group_by(year) %>% summarise(death_rate_boost_vac = sum(deaths_boost_vac_rate_7ma),death_rate_full_vac = sum(deaths_boost_vac_rate_7ma),death_rate_not_full_vac = sum(deaths_not_full_vac_rate_7ma),total_death_rate = death_rate_boost_vac+death_rate_full_vac+death_rate_full_vac)
+kable(t1)
+```
+
+The above table displays the total death rate per 100,000 by vaccination type for years 2021 to 2024. Note that there are many repeat deaths since each obervation in our data set is the 7-day moving average of the last seven days of the death rate per 100,000.
+
+We see that the covid death rate peaked in 2022 and have drastically decreased since then.
+
+```{r,echo = FALSE}
+t2 <- d %>% group_by(age_group) %>% summarise(death_rate_boost_vac = sum(deaths_boost_vac_rate_7ma),death_rate_full_vac = sum(deaths_boost_vac_rate_7ma),death_rate_not_full_vac = sum(deaths_not_full_vac_rate_7ma),total_death_rate = death_rate_boost_vac+death_rate_full_vac+death_rate_not_full_vac)  %>% arrange(desc(total_death_rate)) 
+kable(t2)
+```
+
+The table displays the total death rate per 100,000 by vaccination type for years each age group. 
+
+We see that the covid death rate is notably higher for 60+ year olds compared to all other age groups. The general trend is that younger people suffer less deaths than older people.
+
+
+
+```{r,echo=FALSE}
+d <- d %>% mutate(`(not_full - boost) vac diff` = deaths_not_full_vac_rate_7ma-deaths_boost_vac_rate_7ma,`(not_full - full) vac diff` = deaths_not_full_vac_rate_7ma-deaths_full_vac_rate_7ma,`(full - boost) vac diff` = deaths_full_vac_rate_7ma-deaths_boost_vac_rate_7ma)
+
+t3 <- d  %>% group_by(year) %>% summarise(`total (not_full - boost) vac diff` = sum(`(not_full - boost) vac diff`),`total (not_full - full) vac diff` = sum(`(not_full - full) vac diff`),`total (full - boost) vac diff` = sum(`(full - boost) vac diff`))
+
+kable(t3)
+
+```
+
+The table displays the difference in death rates for each type of vaccine among each age group.
+
+The differences are almost all positive which shows the effectiveness of the vaccine in reducing the death rate. The first two columns have large positive differences which shows the dangers of not being fully vaccinated. The "total (not_full - boost) vac diff" column and "total (not_full - full) vac diff" are quite similar on a yearly basis which suggests that the getting the booster vaccine does not drastically change your chance of survival if you're already fully vaccinated. This is also supported by the "total (full - boost) vac diff" column having much smaller values than the other two. Furthermore, a surprising result is that this column has negative values for 2023 and 2024 which discredits the effectiveness of the booster vaccine.
+ 
+
+# Graphs
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+d <- d %>% mutate(month_name = month(date,label=T), .after=month)
+g1 <- d %>% group_by(year,month_name) %>% summarise(total_death_rate = sum(deaths_boost_vac_rate_7ma)+sum(deaths_full_vac_rate_7ma)+sum(deaths_not_full_vac_rate_7ma))
+
+
+ggplot(g1,aes(x=month_name,y=total_death_rate,col=factor(year),group=factor(year)))+geom_point()+geom_line() + labs(x='Month', y= 'Death Rate per 100,000',title = 'Total Death Rate by Months from 2021-2024',col='Year')
+```
+
+The line chart shows that 2022 has been the worst year in terms of covid deaths. 2021 and 2023 are quite similar, and fortunately 2024 is off to a good start. The general pattern that we see is that the death rate is associated with temperature. The warmer months experience a dip in the death rate while the colder months experience a surge. This makes sense since cold weather encourages people to spend more time indoors in close proximity to others, and some research shows that our immune systems are weakened in cold temperatures.
+
+```{r,echo=FALSE}
+g2 <- t2 %>% slice(1:2) %>% select(!total_death_rate)  %>% pivot_longer(cols=c('death_rate_boost_vac', 'death_rate_full_vac','death_rate_not_full_vac'), names_to='variable', values_to="value")
+
+ggplot(g2, aes(x = age_group, y = value, fill = variable)) + geom_bar(position = "dodge", stat = "identity") + facet_wrap(~age_group)+labs(x='Age Group', y='Total Death Rate per 100,000',title='Death Rate per 100,000 By Age Group and Vaccine Type',fill='Vaccine Type')
+
+```
+
+The bar plot shows the dangers of not being fully vaccinated since the blue bars are much higher than the rest. We also learn about how vulnerable the elderly population since the bars for 40-59 year olds look almost negligable compared to the bars for 60+ year olds.
+
+```{r,echo=FALSE}
+g3 <- t1 %>% select(!total_death_rate) %>%  pivot_longer(cols=c('death_rate_boost_vac', 'death_rate_full_vac','death_rate_not_full_vac'), names_to='variable', values_to="value")
+
+ggplot(g3, aes(x = year, y = value, fill = variable)) + geom_bar(position = "stack", stat = "identity") +labs(x='Year', y='Total Death Rate per 100,000',title='Death Rate per 100,000 By Year and Vaccine Type',fill='Vaccine Type')
+
+
+```
+
+From the bar plot, we find that a vast majority of the deaths come from people who were not fully vaccinated. We also see that the total death rate in 2022 far exceeds the death rates in 2021 and 2023. 2021 and 2023 death rates were similar.
+
